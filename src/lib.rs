@@ -1,5 +1,6 @@
 
 extern crate dsp;
+extern crate num;
 
 use dsp::{Dsp, Sample, Settings};
 
@@ -28,7 +29,7 @@ impl Rms {
         }
         // Determine the RMS for each channel, avoiding any allocations.
         for i in 0..channels {
-            use std::num::Float;
+            use num::Float;
             let sum = samples.chunks(channels)
                 .map(|frame| frame[i])
                 .fold(0.0, |total, sample| total + sample.to_wave().powf(2.0));

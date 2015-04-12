@@ -1,7 +1,5 @@
 //! Read the RMS from the input stream buffer (and pass the input buffer straight to the output).
 
-#![feature(collections)]
-
 extern crate dsp;
 extern crate rms;
 
@@ -21,7 +19,14 @@ fn main() {
             Event::Out(output, settings) => {
                 rms.update_rms(&buffer[..], settings);
                 println!("Input RMS avg: {:?}, RMS per channel: {:?}", rms.avg(), rms.per_channel());
-                output.clone_from_slice(&buffer[..]);
+
+                for (output_sample, sample) in output.iter_mut().zip(buffer.iter().map(|&s| s)) {
+                    *output_sample = sample;
+                }
+
+                // NOTE: The above should be replaced by the following once `clone_from_slice` is
+                // stabilised.
+                // output.clone_from_slice(&buffer[..]);
             },
             _ => (),
         }
