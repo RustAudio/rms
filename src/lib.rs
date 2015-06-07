@@ -2,7 +2,7 @@
 extern crate dsp;
 extern crate num;
 
-use dsp::{Dsp, Sample, Settings};
+use dsp::{Sample, Settings};
 
 pub type RmsUnit = dsp::Wave;
 
@@ -50,7 +50,7 @@ impl Rms {
 
 }
 
-impl<S> Dsp<S> for Rms where S: Sample {
+impl<S> dsp::Node<S> for Rms where S: Sample {
     fn audio_requested(&mut self, samples: &mut [S], settings: Settings) {
         self.update_rms(samples, settings);
     }
