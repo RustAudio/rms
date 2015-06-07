@@ -1,6 +1,6 @@
 [package]
 name = "rms"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["mitchmindtree <mitchell.nordine@gmail.com>"]
 description = "A simple type for calculating and storing the RMS given some buffer of interleaved audio samples."
 readme = "README.md"
