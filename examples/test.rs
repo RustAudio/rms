@@ -3,33 +3,49 @@
 extern crate dsp;
 extern crate rms;
 
-use dsp::{Event, Settings, SoundStream};
+use dsp::{CallbackFlags, CallbackResult, Settings, SoundStream, StreamParams};
 use rms::Rms;
 
 fn main() {
+
+    // The number of channels we want in our stream.
     const CHANNELS: u16 = 2;
-    let mut stream = SoundStream::<f32, f32>::new()
-        .settings(Settings { sample_hz: 44_100, frames: 512, channels: CHANNELS })
-        .run().unwrap();
-    let mut buffer = Vec::new();
+
+    // Construct our Rms reader.
     let mut rms = Rms::new(CHANNELS as usize);
-    for event in stream.by_ref() {
-        match event {
-            Event::In(input) => { ::std::mem::replace(&mut buffer, input); },
-            Event::Out(output, settings) => {
-                rms.update_rms(&buffer[..], settings);
-                println!("Input RMS avg: {:?}, RMS per channel: {:?}", rms.avg(), rms.per_channel());
 
-                for (output_sample, sample) in output.iter_mut().zip(buffer.iter().map(|&s| s)) {
-                    *output_sample = sample;
-                }
+    // Callback used to construct the duplex sound stream.
+    let callback = Box::new(move |input: &[f32], in_settings: Settings,
+                                  output: &mut[f32], _out_settings: Settings,
+                                  _dt: f64,
+                                  _: CallbackFlags| {
 
-                // NOTE: The above should be replaced by the following once `clone_from_slice` is
-                // stabilised.
-                // output.clone_from_slice(&buffer[..]);
-            },
-            _ => (),
+        // Update our rms state.
+        rms.update_rms(input, in_settings);
+
+        println!("Input RMS avg: {:?}, RMS per channel: {:?}", rms.avg(), rms.per_channel());
+
+        // Write the input to the output for fun.
+        for (out_sample, in_sample) in output.iter_mut().zip(input.iter()) {
+            *out_sample = *in_sample;
         }
+
+        CallbackResult::Continue
+    });
+
+    // Construct parameters for a duplex stream and the stream itself.
+    let params = StreamParams::new().channels(CHANNELS as i32);
+    let stream = SoundStream::new()
+        .sample_hz(44_100.0)
+        .frames_per_buffer(512)
+        .duplex(params, params)
+        .run_callback(callback)
+        .unwrap();
+
+    // Wait for our stream to finish.
+    while let Ok(true) = stream.is_active() {
+        ::std::thread::sleep_ms(16);
     }
+
 }
 
