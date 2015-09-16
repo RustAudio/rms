@@ -21,7 +21,7 @@ impl Rms {
     }
 
     /// Update the stored RMS with the RMS of the given buffer of samples.
-    pub fn update_rms<S>(&mut self, samples: &[S], settings: Settings) where S: Sample {
+    pub fn update<S>(&mut self, samples: &[S], settings: Settings) where S: Sample {
         let channels = settings.channels as usize;
         if self.channels.len() != channels {
             // We need to reallocate our Vec with the correct number of channels.
@@ -44,15 +44,15 @@ impl Rms {
     }
 
     /// Return the RMS for each channel.
-    pub fn per_channel(&self) -> Vec<RmsUnit> {
-        self.channels.clone()
+    pub fn per_channel(&self) -> &[RmsUnit] {
+        &self.channels
     }
 
 }
 
 impl<S> dsp::Node<S> for Rms where S: Sample {
     fn audio_requested(&mut self, samples: &mut [S], settings: Settings) {
-        self.update_rms(samples, settings);
+        self.update(samples, settings);
     }
 }
 

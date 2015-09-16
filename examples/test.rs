@@ -21,7 +21,7 @@ fn main() {
                                   _: CallbackFlags| {
 
         // Update our rms state.
-        rms.update_rms(input, in_settings);
+        rms.update(input, in_settings);
 
         println!("Input RMS avg: {:?}, RMS per channel: {:?}", rms.avg(), rms.per_channel());
 
