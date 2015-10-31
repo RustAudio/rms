@@ -8,7 +8,7 @@ Usage
 
 ```Rust
 let mut rms = Rms::new(num_channels);
-rms.udpate_rms(&sample_buffer[..], dsp_settings);
+rms.udpate(&sample_buffer[..], dsp_settings);
 println!("Average RMS across channels: {:?}", rms.avg());
 println!("RMS for each channel: {:?}", rms.per_channel());
 ```
