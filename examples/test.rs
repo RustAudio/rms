@@ -11,7 +11,7 @@ fn main() {
     // The number of channels we want in our stream.
     const CHANNELS: u16 = 2;
     // The size of the **Rms**' moving **Window**.
-    const WINDOW_SIZE: usize = 1024;
+    const WINDOW_SIZE: f64 = 100.0;
 
     // Construct our Rms reader.
     let mut rms = Rms::new(WINDOW_SIZE);
@@ -23,13 +23,11 @@ fn main() {
                                   _: CallbackFlags| {
 
         // Update our rms state.
-        let n_channels = in_settings.channels as usize;
-        let n_frames = in_settings.frames as usize;
-        rms.update(input, n_channels, n_frames);
+        rms.update(input, in_settings);
 
         println!("Input RMS avg: {:?}, RMS per channel: {:?}",
-                 rms.avg(n_frames - 1),
-                 rms.per_channel(n_frames - 1));
+                 rms.avg(in_settings.frames as usize - 1),
+                 rms.per_channel(in_settings.frames as usize - 1));
 
         // Write the input to the output for fun.
         for (out_sample, in_sample) in output.iter_mut().zip(input.iter()) {
