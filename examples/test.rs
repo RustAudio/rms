@@ -11,7 +11,7 @@ fn main() {
     // The number of channels we want in our stream.
     const CHANNELS: u16 = 2;
     // The size of the **Rms**' moving **Window**.
-    const WINDOW_SIZE: usize = 1028;
+    const WINDOW_SIZE: usize = 1024;
 
     // Construct our Rms reader.
     let mut rms = Rms::new(WINDOW_SIZE);

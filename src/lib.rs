@@ -1,6 +1,5 @@
 
 extern crate dsp;
-extern crate num;
 
 use dsp::{Sample, Settings};
 use std::collections::VecDeque;
