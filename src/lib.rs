@@ -57,13 +57,30 @@ impl Window {
     /// The **Window** pops the front sample and adds the new sample to the back.
     ///
     /// The yielded RMS is the RMS of all sample_squares in the window after the new sample is added.
+    ///
+    /// Returns `0.0` if the **Window**'s `sample_squares` buffer is empty.
     pub fn next_rms(&mut self, new_sample: Wave) -> Wave {
+        // If our **Window** has no length, there's nothing to calculate.
+        if self.sample_squares.len() == 0 {
+            return 0.0;
+        }
+
+        // Remove the front sample_square and subtract it from the `sum`.
         let removed_sample_square = self.sample_squares.pop_front().unwrap();
         self.sum -= removed_sample_square;
+
+        // Don't let floating point rounding errors put us below 0.0.
+        if self.sum < 0.0 {
+            self.sum = 0.0;
+        }
+
+        // Push back the new sample_square and add it to the `sum`.
         let new_sample_square = new_sample.powf(2.0);
         self.sample_squares.push_back(new_sample_square);
         self.sum += new_sample_square;
-        let rms = self.sum / self.sample_squares.len() as Wave;
+
+        // Calculate and return the RMS.
+        let rms = (self.sum / self.sample_squares.len() as Wave).sqrt();
         rms
     }
 
