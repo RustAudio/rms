@@ -1,8 +1,10 @@
 
 extern crate dsp;
+extern crate time_calc;
 
 use dsp::{Sample, Settings};
 use std::collections::VecDeque;
+use time_calc::Ms;
 
 /// The floating point **Wave** representing the continuous RMS.
 pub type Wave = dsp::Wave;
@@ -10,8 +12,8 @@ pub type Wave = dsp::Wave;
 /// A type for calculating RMS of a buffer of audio samples and storing it.
 #[derive(Clone, Debug)]
 pub struct Rms {
-    /// The number of samples used to calculate the RMS per sample.
-    n_window_samples: usize,
+    /// The duration of the window used to calculate the RMS in milliseconds.
+    window_ms: Ms,
     /// The RMS at each sample within the interleaved buffer.
     ///
     /// After an **Rms::update** this will represent the RMS at each sample for the previous
@@ -52,6 +54,51 @@ impl Window {
         self.sum = 0.0;
     }
 
+    /// Set the buffer size used to some new size.
+    pub fn set_len(&mut self, n_window_samples: usize) {
+        let len = self.sample_squares.len();
+        if len > n_window_samples {
+            let diff = len - n_window_samples;
+            for _ in 0..diff {
+                self.pop_front();
+            }
+        } else if len < n_window_samples {
+            let diff = n_window_samples - len;
+            for _ in 0..diff {
+                // Push the new fake samples onto the front so they are the first to be removed.
+                // We'll generate the fake samples as the current RMS to avoid affecting the
+                // Window's RMS output as much as possible.
+                let rms = self.calc_rms();
+                self.sample_squares.push_front(rms);
+            }
+        }
+    }
+
+    /// Remove the front sample and subtract it from the `sum`.
+    fn pop_front(&mut self) {
+        let removed_sample_square = self.sample_squares.pop_front().unwrap();
+        self.sum -= removed_sample_square;
+
+        // Don't let floating point rounding errors put us below 0.0.
+        if self.sum < 0.0 {
+            self.sum = 0.0;
+        }
+    }
+
+    /// Determines the square of the given sample, pushes it back onto our buffer and adds it to
+    /// the `sum`.
+    fn push_back(&mut self, new_sample: Wave) {
+        // Push back the new sample_square and add it to the `sum`.
+        let new_sample_square = new_sample.powf(2.0);
+        self.sample_squares.push_back(new_sample_square);
+        self.sum += new_sample_square;
+    }
+
+    /// Calculate the RMS for the **Window** in its current state.
+    fn calc_rms(&self) -> Wave {
+        (self.sum / self.sample_squares.len() as Wave).sqrt()
+    }
+
     /// The next RMS given the new sample in the sequence.
     ///
     /// The **Window** pops the front sample and adds the new sample to the back.
@@ -65,23 +112,10 @@ impl Window {
             return 0.0;
         }
 
-        // Remove the front sample_square and subtract it from the `sum`.
-        let removed_sample_square = self.sample_squares.pop_front().unwrap();
-        self.sum -= removed_sample_square;
+        self.pop_front();
+        self.push_back(new_sample);
 
-        // Don't let floating point rounding errors put us below 0.0.
-        if self.sum < 0.0 {
-            self.sum = 0.0;
-        }
-
-        // Push back the new sample_square and add it to the `sum`.
-        let new_sample_square = new_sample.powf(2.0);
-        self.sample_squares.push_back(new_sample_square);
-        self.sum += new_sample_square;
-
-        // Calculate and return the RMS.
-        let rms = (self.sum / self.sample_squares.len() as Wave).sqrt();
-        rms
+        self.calc_rms()
     }
 
 }
@@ -90,9 +124,9 @@ impl Window {
 impl Rms {
 
     /// Construct a new **Rms** with the given window size as a number of samples.
-    pub fn new(n_window_samples: usize) -> Self {
+    pub fn new<I: Into<Ms>>(window_ms: I) -> Self {
         Rms {
-            n_window_samples: n_window_samples,
+            window_ms: window_ms.into(),
             interleaved_rms: Vec::new(),
             window_per_channel: Vec::new(),
         }
@@ -100,12 +134,15 @@ impl Rms {
 
     /// The same as **Rms::new** but also prepares the **Rms** for the given number of channels and
     /// frames.
-    pub fn with_capacity(n_window_samples: usize, n_channels: usize, n_frames: usize) -> Self {
-        let window_per_channel = (0..n_channels).map(|_| Window::new(n_window_samples)).collect();
-        let n_samples = n_frames * n_channels;
+    pub fn with_capacity<I: Into<Ms>>(window_ms: I, settings: Settings) -> Self {
+        let n_channels = settings.channels as usize;
+        let window_ms: Ms = window_ms.into();
+        let window_samples = window_ms.samples(settings.sample_hz as f64) as usize;
+        let window_per_channel = (0..n_channels).map(|_| Window::new(window_samples)).collect();
+        let n_samples = settings.frames as usize * n_channels;
         let interleaved_rms = Vec::with_capacity(n_samples);
         Rms {
-            n_window_samples: n_window_samples,
+            window_ms: window_ms.into(),
             window_per_channel: window_per_channel,
             interleaved_rms: interleaved_rms,
         }
@@ -119,10 +156,9 @@ impl Rms {
     }
 
     /// Update the stored RMS with the given interleaved buffer of samples.
-    pub fn update<S>(&mut self, samples: &[S], n_channels: usize, n_frames: usize)
+    pub fn update<S>(&mut self, samples: &[S], settings: Settings)
         where S: Sample,
     {
-
         // Resizes a **Vec** using the given function.
         fn resize_vec<T, F>(vec: &mut Vec<T>, new_len: usize, mut new_elem: F)
             where F: FnMut() -> T,
@@ -136,13 +172,23 @@ impl Rms {
             }
         }
 
+        let n_window_samples = self.window_ms.samples(settings.sample_hz as f64) as usize;
+
         // Ensure our `channels` match the `n_channels`.
+        let n_channels = settings.channels as usize;
         if self.window_per_channel.len() != n_channels {
-            let n_window_samples = self.n_window_samples;
             resize_vec(&mut self.window_per_channel, n_channels, || Window::new(n_window_samples));
         }
 
+        // Make sure the window buffer sizes match `n_window_samples`.
+        for window in &mut self.window_per_channel {
+            if window.sample_squares.len() != n_window_samples {
+                window.set_len(n_window_samples);
+            }
+        }
+
         // Ensure each channel's `rms_per_sample` buffer matches `n_frames`.
+        let n_frames = settings.frames as usize;
         let n_samples = n_frames * n_channels;
         if self.interleaved_rms.len() != n_samples {
             resize_vec(&mut self.interleaved_rms, n_samples, || 0.0);
@@ -185,7 +231,7 @@ impl Rms {
 
 impl<S> dsp::Node<S> for Rms where S: Sample {
     fn audio_requested(&mut self, samples: &mut [S], settings: Settings) {
-        self.update(samples, settings.channels as usize, settings.frames as usize);
+        self.update(samples, settings);
     }
 }
 
