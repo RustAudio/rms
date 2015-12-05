@@ -206,20 +206,58 @@ impl Rms {
     }
 
     /// Return the average RMS across all channels at the given frame.
+    ///
+    /// **Panics** if the given frame index is out of bounds.
     pub fn avg(&self, frame_idx: usize) -> Wave {
         let frame_slice = self.per_channel(frame_idx);
         let total_rms = frame_slice.iter().fold(0.0, |total, &rms| total + rms);
-        let avg_rms = total_rms / self.window_per_channel.len() as Wave;
+        let n_channels = self.window_per_channel.len();
+        let avg_rms = total_rms / n_channels as Wave;
         avg_rms
     }
 
-    /// Return the RMS for each channel.
+    /// Return the RMS for each channel at the given frame.
+    ///
+    /// **Panics** if the given frame index is out of bounds.
     pub fn per_channel(&self, frame_idx: usize) -> &[Wave] {
         let n_channels = self.window_per_channel.len();
         let slice_idx = frame_idx * n_channels;
         let end_idx = slice_idx + n_channels;
         let frame_slice = &self.interleaved_rms[slice_idx..end_idx];
         frame_slice
+    }
+
+    /// The index of the last frame if there is one.
+    fn last_frame(&self) -> Option<usize> {
+        let n_channels = self.window_per_channel.len();
+        let n_samples = self.interleaved_rms.len();
+
+        // If we don't have any channels or samples, just return None.
+        if n_channels == 0 || n_samples == 0 {
+            return None;
+        }
+
+        let n_frames = n_samples / n_channels;
+        let last_frame = n_frames - 1;
+        Some(last_frame)
+    }
+
+    /// The average RMS across all channels at the last frame.
+    ///
+    /// Returns `0.0` if there are no frames.
+    pub fn avg_at_last_frame(&self) -> Wave {
+        self.last_frame()
+            .map(|last_frame| self.avg(last_frame))
+            .unwrap_or(0.0)
+    }
+
+    /// The RMS for each channel at the last frame.
+    ///
+    /// Returns an empty slice if there are no frames.
+    pub fn per_channel_at_last_frame(&self) -> &[Wave] {
+        self.last_frame()
+            .map(|last_frame| self.per_channel(last_frame))
+            .unwrap_or(&[])
     }
 
     /// Borrow the internal RMS interleaved buffer.

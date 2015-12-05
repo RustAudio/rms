@@ -26,8 +26,8 @@ fn main() {
         rms.update(input, in_settings);
 
         println!("Input RMS avg: {:?}, RMS per channel: {:?}",
-                 rms.avg(in_settings.frames as usize - 1),
-                 rms.per_channel(in_settings.frames as usize - 1));
+                 rms.avg_at_last_frame(),
+                 rms.per_channel_at_last_frame());
 
         // Write the input to the output for fun.
         for (out_sample, in_sample) in output.iter_mut().zip(input.iter()) {
