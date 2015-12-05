@@ -7,17 +7,18 @@ Usage
 -----
 
 ```Rust
-let mut rms = Rms::new(num_channels);
+const WINDOW_SIZE_MS: f64 = 10.0;
+let mut rms = Rms::new(WINDOW_SIZE_MS);
 rms.udpate(&sample_buffer[..], dsp_settings);
-println!("Average RMS across channels: {:?}", rms.avg());
-println!("RMS for each channel: {:?}", rms.per_channel());
+println!("Average RMS across channels at the last frame: {:?}", rms.avg_at_last_frame());
+println!("RMS for each channel at the last frame: {:?}", rms.per_channel_at_last_frame());
 ```
 
-The `Rms` type also implements `dsp-chain`'s `Dsp` trait, meaning it can be used as a node within a DspGraph.
+The `Rms` type also implements `dsp-chain`'s `Dsp` trait, meaning it can be updated as a node within a DspGraph.
 
 Add the `rms` crate to your dependencies like so:
 
 ```
 [dependencies]
-rms = "*"
+rms = "<version>"
 ```
