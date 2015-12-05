@@ -1,10 +1,10 @@
 
 extern crate dsp;
-extern crate time_calc;
+extern crate time_calc as time;
 
 use dsp::{Sample, Settings};
 use std::collections::VecDeque;
-use time_calc::Ms;
+use time::Ms;
 
 /// The floating point **Wave** representing the continuous RMS.
 pub type Wave = dsp::Wave;
@@ -263,6 +263,11 @@ impl Rms {
     /// Borrow the internal RMS interleaved buffer.
     pub fn interleaved_rms(&self) -> &[Wave] {
         &self.interleaved_rms
+    }
+
+    /// The window size in milliseconds.
+    pub fn window_ms(&self) -> time::calc::Ms {
+        self.window_ms.ms()
     }
 
 }
